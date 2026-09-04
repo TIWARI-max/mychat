@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>MYChat — Room-Based Messenger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -31,16 +31,12 @@
   
   html, body{
     height: 100%;
-    height: 100dvh;
-    width: 100vw;
+    width: 100%;
     overflow: hidden;
-  }
-  body{
     background: var(--bg);
     color: var(--text);
     font-family: var(--sans);
-    position: fixed;
-    inset: 0;
+    overscroll-behavior: none;
   }
   
   @media (prefers-reduced-motion: reduce){
@@ -48,10 +44,16 @@
   }
   
   #app{
-    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
-    position: relative;
+    height: 100%;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
   
   ::-webkit-scrollbar{ width:6px; }
@@ -91,6 +93,8 @@
     justify-content: center;
     padding: 20px;
     overflow-y: auto;
+    position: relative;
+    z-index: 1;
   }
   .join-card{
     width: 100%;
@@ -128,6 +132,76 @@
   .connect-btn:disabled{ opacity:0.5; cursor:not-allowed; }
   .join-error{ color: var(--red); font-size:12.5px; margin-top:12px; font-family: var(--sans); display:none; }
 
+  /* ---------- 2D animated background ---------- */
+  #bgCanvas{
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ---------- 3D flip card ---------- */
+  .card-scene{
+    width: 100%;
+    max-width: 420px;
+    perspective: 1600px;
+  }
+  .card-scene .join-card{
+    width: 100%;
+    max-width: none;
+    position: relative;
+    transition: transform 0.28s ease;
+    animation: fadeSlideUp 0.45s ease both;
+  }
+  .join-card.rotY90{ transform: rotateY(90deg); }
+  .join-card.rotYneg90{ transform: rotateY(-90deg); transition: none; }
+  .step-panel.hidden{ display: none; }
+
+  .step-dots{ display:flex; gap:6px; margin: 16px 0 20px; }
+  .step-dots .sd{ width:6px; height:6px; border-radius:50%; background: var(--line); transition: background .25s ease, width .25s ease; }
+  .step-dots .sd.active{ background: var(--mint-deep); width:16px; border-radius:4px; }
+
+  .back-link{
+    background:none; border:none; color: var(--text-dim); font-family: var(--sans);
+    font-size:12.5px; cursor:pointer; margin-top:12px; padding:6px 2px; width:100%;
+    display:flex; align-items:center; justify-content:center; gap:4px; transition: color .15s ease;
+  }
+  .back-link:hover{ color: var(--text); }
+
+  /* ---------- 3D rotating cube ---------- */
+  .orb3d{
+    width: 30px; height: 30px;
+    margin-left: auto;
+    perspective: 220px;
+    flex-shrink: 0;
+  }
+  .orb3d .cube{
+    width: 100%; height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    animation: cubeSpin 7s linear infinite;
+  }
+  .orb3d .face{
+    position: absolute;
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--mint), var(--mint-deep));
+    border: 1px solid rgba(255,255,255,0.5);
+    opacity: 0.9;
+    border-radius: 3px;
+  }
+  .orb3d .f1{ transform: translateZ(15px); }
+  .orb3d .f2{ transform: rotateY(90deg) translateZ(15px); }
+  .orb3d .f3{ transform: rotateY(180deg) translateZ(15px); }
+  .orb3d .f4{ transform: rotateY(-90deg) translateZ(15px); }
+  .orb3d .f5{ transform: rotateX(90deg) translateZ(15px); }
+  .orb3d .f6{ transform: rotateX(-90deg) translateZ(15px); }
+  @keyframes cubeSpin{
+    from{ transform: rotateX(0deg) rotateY(0deg); }
+    to{ transform: rotateX(360deg) rotateY(360deg); }
+  }
+
   /* ================= CHAT ================= */
   #chat{
     display: none;
@@ -135,6 +209,8 @@
     width: 100%;
     background: var(--bg);
     overflow: hidden;
+    position: relative;
+    z-index: 1;
   }
   .chat-shell{
     height: 100%;
@@ -181,8 +257,9 @@
     gap:6px; flex-shrink: 0;
   }
   .leave-btn:hover{ border-color: var(--red); color: var(--red); background: rgba(229,101,78,0.06); }
+  .scrim{ display: none; }
 
-  /* Main Chat Window (Crucial Flex Container Fixes) */
+  /* Main Chat Window */
   .main{
     display: flex;
     flex-direction: column;
@@ -198,11 +275,10 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 14px 20px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--line);
     background: var(--surface);
     flex-shrink: 0;
-    height: 60px;
     z-index: 5;
   }
   .menu-toggle{
@@ -265,18 +341,19 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 20px 24px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
+    -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
   .msg-empty{ margin:auto; text-align:center; color: var(--text-dim); font-size:13px; }
   .msg-empty::before{ content:'— '; }
   .msg-empty::after{ content:' —'; }
-  .msg-row{ display:flex; flex-direction:column; max-width:68%; flex-shrink: 0; }
+  .msg-row{ display:flex; flex-direction:column; max-width:75%; flex-shrink: 0; }
   .msg-row.own{ align-self:flex-end; align-items:flex-end; animation: msgPopOwn 0.2s ease both; }
-  .msg-row.other{ align-self:flex-start; align-items:flex-start; animation: msgPopOther 0.2s ease both; flex-direction:row; gap:8px; max-width:72%; }
+  .msg-row.other{ align-self:flex-start; align-items:flex-start; animation: msgPopOther 0.2s ease both; flex-direction:row; gap:8px; max-width:80%; }
   .msg-row.other .msg-col{ display:flex; flex-direction:column; align-items:flex-start; min-width:0; }
   .msg-row.other .member-avatar{ margin-top:2px; }
   .msg-row.system{ animation: msgPopSystem 0.25s ease both; align-self:center; max-width:90%; }
@@ -284,10 +361,10 @@
   .msg-meta .who.own{ color: var(--mint-deep); font-weight:600; }
   .msg-meta .who.other{ color: var(--text); font-weight:600; }
   .msg-bubble{
-    padding: 10px 15px;
+    padding: 9px 14px;
     border-radius: 16px;
-    font-size: 14px;
-    line-height: 1.45;
+    font-size: 14.5px;
+    line-height: 1.4;
     word-break: break-word;
     overflow-wrap: break-word;
     white-space: pre-wrap;
@@ -296,45 +373,56 @@
   .msg-row.other .msg-bubble{ background: var(--surface); border:1px solid var(--line); color: var(--text); border-bottom-left-radius:4px; box-shadow: 0 1px 4px rgba(30,42,50,0.04); }
   .msg-row.system .msg-bubble{ background: var(--surface-alt); color: var(--text-dim); font-size:11.5px; text-align:center; padding:4px 10px; border-radius:16px; }
 
-  /* Input Composer */
+  /* WhatsApp-Style Floating Composer */
   .composer{
     display: flex;
     align-items: flex-end;
-    gap: 10px;
-    padding: 14px 20px;
-    border-top: 1px solid var(--line);
-    background: var(--surface);
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
     flex-shrink: 0;
+    z-index: 10;
+  }
+  .input-wrapper{
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
   .composer textarea{
-    flex: 1;
+    width: 100%;
     resize: none;
     background: transparent;
     border: none;
-    border-bottom: 1.5px solid var(--line);
     color: var(--text);
-    padding: 8px 2px;
     font-family: var(--sans);
-    font-size: 15px;
+    font-size: 16px; /* 16px prevents iOS/Android automatic zoom jumps */
     outline: none;
-    max-height: 100px;
+    max-height: 90px;
     line-height: 1.35;
+    padding: 4px 0;
+    margin: 0;
+    display: block;
   }
-  .composer textarea:focus{ border-bottom-color: var(--mint-deep); }
-  .composer textarea::placeholder{ color:#A9B4BB; font-size:14px; }
+  .composer textarea::placeholder{ color:#A9B4BB; font-size:15px; }
   .send-btn{
     background: var(--mint-deep);
     color: #FFFFFF;
     border: none;
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
-    font-size: 15px;
+    font-size: 16px;
+    box-shadow: 0 2px 5px rgba(63,168,149,0.3);
   }
   .send-btn:active{ transform: scale(0.92); }
 
@@ -373,24 +461,8 @@
       transition: opacity .25s ease;
     }
     .scrim.open{ display: block; opacity: 1; }
-    
     .msg-row{ max-width: 86%; }
     .msg-row.other{ max-width: 88%; }
-    
-    .chat-header{
-      padding: 10px 12px;
-      padding-top: max(10px, env(safe-area-inset-top));
-      height: auto;
-      min-height: 52px;
-      gap: 8px;
-    }
-    .chat-header .title{ font-size: 13.5px; }
-    .messages{ padding: 12px 14px; }
-    .composer{
-      padding: 10px 12px;
-      padding-bottom: max(10px, env(safe-area-inset-bottom));
-    }
-    .composer textarea{ font-size: 16px; }
   }
 
   @media (max-width: 380px){
@@ -427,26 +499,56 @@
 <body>
 <div id="app">
 
+  <canvas id="bgCanvas"></canvas>
+
   <div id="landing">
-    <div class="join-card">
-      <div class="brand-row">
-        <div class="brand-mark">[ MY<span>CHAT</span> ]</div>
-        <div class="pulse-dot"></div>
-      </div>
-      <p class="join-sub">Enter a shared IP address to join the same room. Anyone who enters the same address lands in the same conversation.</p>
+    <div class="card-scene">
+      <div class="join-card" id="joinCard">
 
-      <div class="field">
-        <label for="username">USERNAME</label>
-        <input id="username" type="text" placeholder="e.g. nullpointer" maxlength="24" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="roomip">IP ADDRESS (ROOM CODE)</label>
-        <input id="roomip" type="text" placeholder="e.g. 192.168.0.42" maxlength="40" autocomplete="off">
-        <div class="field-hint">Anyone who enters the same IP will share this room.</div>
-      </div>
+        <!-- STEP 1: USERNAME -->
+        <div class="step-panel" id="stepUsername">
+          <div class="brand-row">
+            <div class="brand-mark">[ MY<span>CHAT</span> ]</div>
+            <div class="orb3d"><div class="cube">
+              <div class="face f1"></div><div class="face f2"></div><div class="face f3"></div>
+              <div class="face f4"></div><div class="face f5"></div><div class="face f6"></div>
+            </div></div>
+          </div>
+          <p class="join-sub">First, tell us who you are. Next you'll enter a shared IP address to join a room.</p>
 
-      <button class="connect-btn" id="connectBtn">CONNECT →</button>
-      <div class="join-error" id="joinError"></div>
+          <div class="step-dots"><span class="sd active"></span><span class="sd"></span></div>
+
+          <div class="field">
+            <label for="username">USERNAME</label>
+            <input id="username" type="text" placeholder="e.g. nullpointer" maxlength="24" autocomplete="off">
+          </div>
+
+          <button class="connect-btn" id="nextBtn">NEXT →</button>
+          <div class="join-error" id="joinErrorStep1"></div>
+        </div>
+
+        <!-- STEP 2: IP ADDRESS -->
+        <div class="step-panel hidden" id="stepRoom">
+          <div class="brand-row">
+            <div class="brand-mark">[ MY<span>CHAT</span> ]</div>
+            <div class="pulse-dot"></div>
+          </div>
+          <p class="join-sub">Hey <b id="helloName" style="color:var(--mint-deep)">there</b> — now enter a shared IP address. Anyone who enters the same address lands in the same room.</p>
+
+          <div class="step-dots"><span class="sd"></span><span class="sd active"></span></div>
+
+          <div class="field">
+            <label for="roomip">IP ADDRESS (ROOM CODE)</label>
+            <input id="roomip" type="text" placeholder="e.g. 192.168.0.42" maxlength="40" autocomplete="off">
+            <div class="field-hint">Anyone who enters the same IP will share this room.</div>
+          </div>
+
+          <button class="connect-btn" id="connectBtn">CONNECT →</button>
+          <button class="back-link" id="backBtn">← back to username</button>
+          <div class="join-error" id="joinError"></div>
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -477,9 +579,11 @@
           <div class="msg-empty">Start of conversation</div>
         </div>
 
-        <div class="composer">
-          <textarea id="msgInput" placeholder="Message the room…" rows="1"></textarea>
-          <button class="send-btn" id="sendBtn" aria-label="Send">↩</button>
+        <div class="composer" id="composer">
+          <div class="input-wrapper">
+            <textarea id="msgInput" placeholder="Message" rows="1"></textarea>
+          </div>
+          <button class="send-btn" id="sendBtn" aria-label="Send">➤</button>
         </div>
       </div>
     </div>
@@ -529,6 +633,7 @@
   let myMemberRef = null;
 
   const $ = (id) => document.getElementById(id);
+  const appEl = $('app');
   const landing = $('landing'), chat = $('chat');
   const usernameInput = $('username'), roomInput = $('roomip');
   const connectBtn = $('connectBtn'), joinError = $('joinError');
@@ -537,6 +642,9 @@
   const messagesEl = $('messages'), msgInput = $('msgInput'), sendBtn = $('sendBtn');
   const leaveBtn = $('leaveBtn'), clearBtn = $('clearBtn'), connStatus = $('connStatus');
   const menuToggle = $('menuToggle'), sidebar = $('sidebar'), scrim = $('scrim');
+  const joinCard = $('joinCard'), nextBtn = $('nextBtn'), backBtn = $('backBtn');
+  const joinErrorStep1 = $('joinErrorStep1'), helloName = $('helloName');
+  const stepUsername = $('stepUsername'), stepRoom = $('stepRoom');
 
   function safeRoomId(raw){
     return raw.trim().replace(/[.#$\[\]\/]/g, '_');
@@ -557,11 +665,83 @@
     return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
   }
 
-  // ---------- connect ----------
-  connectBtn.addEventListener('click', connect);
-  [usernameInput, roomInput].forEach(inp => {
-    inp.addEventListener('keydown', (e) => { if(e.key === 'Enter') connect(); });
+  // ---------- Step Transitions ----------
+  nextBtn.addEventListener('click', goToStep2);
+  usernameInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') goToStep2(); });
+  backBtn.addEventListener('click', goToStep1);
+
+  function flipTo(fromPanel, toPanel, afterSwap){
+    joinCard.classList.add('rotY90');
+    setTimeout(() => {
+      fromPanel.classList.add('hidden');
+      toPanel.classList.remove('hidden');
+      if(typeof afterSwap === 'function') afterSwap();
+
+      joinCard.classList.remove('rotY90');
+      joinCard.classList.add('rotYneg90');
+      void joinCard.offsetWidth;
+      joinCard.classList.remove('rotYneg90');
+    }, 280);
+  }
+
+  function goToStep2(){
+    joinErrorStep1.style.display = 'none';
+    const u = usernameInput.value.trim();
+    if(!u){ showStep1Error('Enter a username to continue.'); return; }
+    if(u.length > 24){ showStep1Error('Username is too long.'); return; }
+
+    helloName.textContent = u;
+    flipTo(stepUsername, stepRoom, () => setTimeout(() => roomInput.focus(), 60));
+  }
+
+  function goToStep1(){
+    joinError.style.display = 'none';
+    flipTo(stepRoom, stepUsername, () => setTimeout(() => usernameInput.focus(), 60));
+  }
+
+  function showStep1Error(text){
+    joinErrorStep1.textContent = text;
+    joinErrorStep1.style.display = 'block';
+  }
+
+  // ---------- WhatsApp-Grade Viewport / Keyboard Sync ----------
+  function scrollToBottom(smooth = false){
+    requestAnimationFrame(() => {
+      if(smooth){
+        messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+      } else {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+    });
+  }
+
+  function syncViewport(){
+    if(window.visualViewport){
+      // Direct viewport height mapping ensures the composer sits flush above the keyboard
+      appEl.style.height = `${window.visualViewport.height}px`;
+      appEl.style.top = `${window.visualViewport.offsetTop}px`;
+      window.scrollTo(0, 0);
+    }
+    if(chat.style.display === 'block'){
+      scrollToBottom();
+    }
+  }
+
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', syncViewport);
+    window.visualViewport.addEventListener('scroll', syncViewport);
+  } else {
+    window.addEventListener('resize', syncViewport);
+  }
+
+  msgInput.addEventListener('focus', () => {
+    setTimeout(syncViewport, 150);
+    setTimeout(() => scrollToBottom(true), 250);
   });
+
+  // ---------- Connect ----------
+  connectBtn.addEventListener('click', connect);
+  roomInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') connect(); });
 
   function connect(){
     if(!firebaseReady){
@@ -572,9 +752,9 @@
     const r = roomInput.value.trim();
     joinError.style.display = 'none';
 
-    if(!u){ showJoinError('Enter a username to connect.'); return; }
+    if(!u){ goToStep1(); showStep1Error('Enter a username to connect.'); return; }
     if(!r){ showJoinError('Enter an IP address (room code).'); return; }
-    if(u.length > 24){ showJoinError('Username is too long.'); return; }
+    if(u.length > 24){ goToStep1(); showStep1Error('Username is too long.'); return; }
 
     connectBtn.disabled = true;
     connectBtn.textContent = 'CONNECTING…';
@@ -606,6 +786,7 @@
     roomLabel.textContent = roomKey;
     roomLabel2.textContent = roomKey;
     messagesEl.innerHTML = '';
+    syncViewport();
 
     db.ref('.info/connected').on('value', (snap) => {
       if(snap.val() === true){
@@ -630,18 +811,10 @@
       const val = snap.val() || {};
       renderMembers(val);
     });
-
-    msgInput.focus();
   }
 
-  // ---------- messages ----------
+  // ---------- Messages ----------
   let renderedKeys = new Set();
-
-  function scrollToBottom(){
-    requestAnimationFrame(() => {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    });
-  }
 
   function renderMessages(list){
     messagesEl.innerHTML = '';
@@ -703,20 +876,25 @@
     messagesRef.push({ user: username, text: text, ts: firebase.database.ServerValue.TIMESTAMP });
     msgInput.value = '';
     autoGrow();
+    scrollToBottom();
     msgInput.focus();
   }
 
   sendBtn.addEventListener('click', sendMessage);
   msgInput.addEventListener('keydown', (e) => {
-    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+    if(e.key === 'Enter' && !e.shiftKey){ 
+      e.preventDefault(); 
+      sendMessage(); 
+    }
   });
   msgInput.addEventListener('input', autoGrow);
+
   function autoGrow(){
     msgInput.style.height = 'auto';
-    msgInput.style.height = Math.min(msgInput.scrollHeight, 100) + 'px';
+    msgInput.style.height = Math.min(msgInput.scrollHeight, 90) + 'px';
   }
 
-  // ---------- members ----------
+  // ---------- Members ----------
   function renderMembers(members){
     const entries = Object.entries(members).sort((a,b) => a[0].localeCompare(b[0]));
     onlineCount.textContent = entries.length + ' online';
@@ -734,7 +912,7 @@
     });
   }
 
-  // ---------- leave / clear ----------
+  // ---------- Leave / Clear ----------
   leaveBtn.addEventListener('click', leaveRoom);
   function leaveRoom(){
     if(messagesRef) messagesRef.push({ sys:true, user:'', text: username + ' left the room', ts: firebase.database.ServerValue.TIMESTAMP });
@@ -747,10 +925,14 @@
     connectBtn.disabled = false;
     connectBtn.textContent = 'CONNECT →';
     roomInput.value = '';
+    usernameInput.value = '';
     username = '';
     roomKey = '';
     sidebar.classList.remove('open');
     scrim.classList.remove('open');
+    joinCard.classList.remove('rotY90', 'rotYneg90');
+    stepRoom.classList.add('hidden');
+    stepUsername.classList.remove('hidden');
   }
 
   clearBtn.addEventListener('click', () => {
@@ -760,7 +942,7 @@
     });
   });
 
-  // ---------- mobile drawer ----------
+  // ---------- Mobile Drawer ----------
   menuToggle.addEventListener('click', () => {
     sidebar.classList.toggle('open');
     scrim.classList.toggle('open');
@@ -769,6 +951,72 @@
     sidebar.classList.remove('open');
     scrim.classList.remove('open');
   });
+
+  // ---------- Background Animation ----------
+  (function initBgAnimation(){
+    const canvas = $('bgCanvas');
+    const ctx = canvas.getContext('2d');
+    let w, h, dpr, particles = [];
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function resize(){
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const count = Math.min(70, Math.round((w * h) / 18000));
+      particles = Array.from({length: count}, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        r: 1 + Math.random() * 1.8
+      }));
+    }
+
+    function step(){
+      ctx.clearRect(0, 0, w, h);
+      particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        if(p.x < 0 || p.x > w) p.vx *= -1;
+        if(p.y < 0 || p.y > h) p.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(63,168,149,0.35)';
+        ctx.fill();
+      });
+      const maxDist = 140;
+      for(let i = 0; i < particles.length; i++){
+        for(let j = i + 1; j < particles.length; j++){
+          const a = particles[i], b = particles[j];
+          const dx = a.x - b.x, dy = a.y - b.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if(dist < maxDist){
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = 'rgba(111,207,192,' + (0.18 * (1 - dist / maxDist)) + ')';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
+      if(!reduceMotion) requestAnimationFrame(step);
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+    if(reduceMotion){
+      step();
+    } else {
+      requestAnimationFrame(step);
+    }
+  })();
 
 })();
 </script>
