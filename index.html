@@ -10,10 +10,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-
 <style>
   :root {
     --bg-gradient-1: #6366F1;
@@ -218,6 +214,18 @@
   .header-text-block .subtitle { color: rgba(255,255,255,0.8); font-size: 13px; font-weight: 600; transition: color 0.3s; margin-top: 2px;}
   .header-text-block .subtitle.live { color: #10B981; }
   .header-text-block .subtitle.down { color: #FCA5A5; }
+
+  /* Inline Online Members List */
+  .header-text-block .online-users-list {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   
   /* THE MAGICAL 3D SCOOP */
   .header-right-scoop {
@@ -403,6 +411,8 @@
     .circ-btn { width: 40px; height: 40px; }
     .circ-btn svg { width: 18px; height: 18px; }
     
+    .header-text-block .online-users-list { max-width: 150px; }
+
     .messages { padding: 0 16px 16px 16px; }
     .composer { padding: 10px 12px 16px; gap: 10px;}
     .input-wrapper { padding: 8px 16px; }
@@ -483,6 +493,7 @@
             <div class="header-text-block">
               <div class="title" id="roomLabel2">—</div>
               <div class="subtitle" id="connStatus">connecting...</div>
+              <div class="online-users-list" id="topOnlineUsers"></div>
             </div>
           </div>
           <div class="header-right-scoop">
@@ -540,6 +551,10 @@
   </div>
 </div>
 
+<!-- Scripts Moved To End of Body to Speed Up Application Load Time -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
 <script>
 (function(){
   'use strict';
@@ -581,6 +596,13 @@
   let roomAdmin = null;
   let isSuperAdmin = false; 
   let isOnline = navigator.onLine;
+
+  // Background Websocket Pre-Warmer for Instant Login
+  if(firebaseReady){
+    try {
+        db.ref('.info/connected').on('value', () => {}); 
+    } catch(e){}
+  }
   
   // Pending and Read state tracking
   let pendingKeys = new Set();
@@ -713,6 +735,11 @@
   function escapeHtml(str){ const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
   function initials(name){ return (name || '?').trim().slice(0,2).toUpperCase(); }
   function fmtTime(ts){ return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+  function avatarColor(name) {
+    let hash = 0; for(let i=0; i<name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+    return '#' + ('00000'.substring(0, 6 - c.length) + c);
+  }
   
   function updateHeaderAvatar(name) {
     const avatar = $('headerRoomAvatar');
@@ -816,6 +843,9 @@
     roomLabel.textContent = 'SUPER ADMIN';
     roomLabel2.textContent = 'Select a room';
     updateHeaderAvatar('Admin');
+    
+    const topOnlineEl = $('topOnlineUsers');
+    if (topOnlineEl) topOnlineEl.textContent = '';
     
     adminBadge.style.display = 'block';
     adminBadge.textContent = 'GOD MODE';
@@ -1185,7 +1215,7 @@
     if (m.isLocal || pendingKeys.has(m._key)) { row.classList.add('pending'); }
 
     let innerHTML = '';
-    if (!own) { innerHTML += `<div class="member-avatar">${escapeHtml(initials(m.user))}</div><div class="msg-col">`; }
+    if (!own) { innerHTML += `<div class="member-avatar" style="background:${avatarColor(m.user)}">${escapeHtml(initials(m.user))}</div><div class="msg-col">`; }
 
     innerHTML += `<div class="msg-meta"><span class="who ${own?'own':'other'}">${escapeHtml(m.user)}</span></div>`;
 
@@ -1416,11 +1446,19 @@
     const entries = Object.entries(members).sort((a,b) => a[0].localeCompare(b[0]));
     onlineCount.textContent = entries.length + ' online';
     membersList.innerHTML = '';
+    
     let typers = [];
+    let otherOnlineNames = [];
 
     entries.forEach(([safeName, data]) => {
       const name = data.name || safeName;
       const joinTs = data.ts;
+      
+      // ONLY add to header list if it's NOT the current user
+      if (name !== username) {
+        otherOnlineNames.push(name);
+      }
+      
       if (data.typing && name !== username) typers.push(name);
 
       const row = document.createElement('div');
@@ -1438,6 +1476,15 @@
         <div class="member-status"></div>`;
       membersList.appendChild(row);
     });
+
+    const topOnlineEl = document.getElementById('topOnlineUsers');
+    if (topOnlineEl && !isSuperAdmin) {
+      if (otherOnlineNames.length > 0) {
+        topOnlineEl.textContent = 'Online: ' + otherOnlineNames.join(', ');
+      } else {
+        topOnlineEl.textContent = ''; // Hide entirely if alone
+      }
+    }
 
     if (typers.length > 0) {
       typingName.textContent = typers.join(', ') + (typers.length > 1 ? ' are typing...' : ' is typing...');
@@ -1484,6 +1531,9 @@
     isSuperAdmin = false;
     document.querySelector('.members-label').textContent = 'MEMBERS';
     adminBadge.style.display = 'none';
+    
+    const topOnlineEl = document.getElementById('topOnlineUsers');
+    if (topOnlineEl) topOnlineEl.textContent = '';
 
     chat.style.display = 'none'; landing.style.display = 'flex';
     connectBtn.disabled = false; connectBtn.textContent = 'CONNECT →';
@@ -1519,7 +1569,11 @@
     function resize(){
       dpr = Math.min(window.devicePixelRatio || 1, 2); w = window.innerWidth; h = window.innerHeight;
       canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); const count = Math.min(80, Math.round((w * h) / 15000));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); 
+      
+      // OPTIMIZATION: Reduce max particles slightly on large tablet screens to ensure 60fps
+      const isTablet = w <= 1024;
+      const count = Math.min(isTablet ? 45 : 80, Math.round((w * h) / (isTablet ? 25000 : 15000)));
       
       const isDark = document.documentElement.classList.contains('dark-mode');
       const colors = isDark ? ['#333333', '#555555', '#777777', '#aaaaaa'] : ['#6366F1', '#EC4899', '#06B6D4', '#ffffff']; 
@@ -1537,6 +1591,7 @@
       ctx.clearRect(0, 0, w, h);
       
       const isDark = document.documentElement.classList.contains('dark-mode');
+      const isTablet = w <= 1024;
       
       particles.forEach(p => {
         const dxMouse = mouseX - p.x; const dyMouse = mouseY - p.y;
@@ -1555,14 +1610,30 @@
         
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); 
         ctx.fillStyle = p.color;
-        ctx.shadowBlur = 15; ctx.shadowColor = p.color;
-        ctx.fill(); ctx.shadowBlur = 0; 
+        
+        // OPTIMIZATION: Disable expensive shadowBlur rendering on tablets
+        if (!isTablet) {
+          ctx.shadowBlur = 15; 
+          ctx.shadowColor = p.color;
+        }
+        
+        ctx.fill(); 
+        
+        if (!isTablet) {
+          ctx.shadowBlur = 0; 
+        }
       });
+      
       const maxDist = 180;
+      const maxDistSq = maxDist * maxDist; // OPTIMIZATION: Squared distance for rendering speed loop
+      
       for(let i = 0; i < particles.length; i++){
         for(let j = i + 1; j < particles.length; j++){
-          const a = particles[i], b = particles[j], dx = a.x - b.x, dy = a.y - b.y, dist = Math.sqrt(dx*dx + dy*dy);
-          if(dist < maxDist){ 
+          const a = particles[i], b = particles[j], dx = a.x - b.x, dy = a.y - b.y;
+          const distSq = dx*dx + dy*dy;
+          
+          if(distSq < maxDistSq){ 
+            const dist = Math.sqrt(distSq); // Only calc sqrt if definitely in range
             ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); 
             ctx.strokeStyle = isDark ? `rgba(255, 255, 255, ${0.1 * (1 - dist / maxDist)})` : `rgba(255, 255, 255, ${0.2 * (1 - dist / maxDist)})`; 
             ctx.lineWidth = 1.5; ctx.stroke(); 
