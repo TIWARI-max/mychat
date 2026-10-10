@@ -839,9 +839,12 @@
 
   connectBtn.addEventListener('click', connect);
 
-  // Quick join defaults: no need to enter a name or room code.
-  usernameInput.value = 'AD';
-  roomInput.value = ''; 
+  // Fix username as AD and skip directly to the room code screen
+usernameInput.value = 'AD';
+roomInput.value = ''; // Leave blank so the user can type their room
+stepUsername.classList.add('hidden');
+stepRoom.classList.remove('hidden');
+backBtn.style.display = 'none'; // Prevents them from going back to change the name
 
   function connect(){
     username = usernameInput.value.trim();
@@ -1873,8 +1876,7 @@
 })();
 </script>
 
-<button id="pwaInstallBtn" style="display:none;position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:9999;background:#4A44D4;color:#fff;border:none;border-radius:999px;padding:12px 20px;font-family:'Poppins',sans-serif;font-weight:600;font-size:14px;box-shadow:0 10px 25px -5px rgba(74,68,212,0.5);cursor:pointer;">⬇ Install App</button>
-<script>
+ <!-- <script>
 (function(){
   // --- PWA installability: register a service worker from an inline blob (no separate file needed) ---
   var swSource = [
@@ -1931,7 +1933,7 @@
     });
   }
 })();
-</script>
+</script> -->
 
 <script>
 /* MYChat usability upgrades: in-room search, keyboard shortcuts and local draft recovery. */
@@ -2009,5 +2011,6 @@
 })();
 </script>
 </body>
-</html>
+</html> 
+
  
