@@ -424,9 +424,7 @@
     .reply-banner { margin: 0 12px -16px 12px; padding: 8px 14px 18px 14px; }
   }
 
-/* Quick join: fixed identity and room; no username/IP prompts */
-#landing .field, #landing #nextBtn, #landing #backBtn, #landing .step-dots,
-#landing .join-sub { display:none !important; }
+
 
   /* MYChat usability upgrade */
   .mychat-tools{display:flex;align-items:center;gap:7px}
@@ -843,12 +841,7 @@
 
   // Quick join defaults: no need to enter a name or room code.
   usernameInput.value = 'AD';
-  roomInput.value = '2425';
-  stepUsername.classList.add('hidden');
-  stepRoom.classList.remove('hidden');
-  connectBtn.textContent = 'CONNECTING…';
-  connect();
-  roomInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') connect(); });
+  roomInput.value = ''; 
 
   function connect(){
     username = usernameInput.value.trim();
@@ -2017,4 +2010,4 @@
 </script>
 </body>
 </html>
-
+ 
