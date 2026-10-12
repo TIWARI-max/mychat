@@ -2012,5 +2012,25 @@ backBtn.style.display = 'none'; // Prevents them from going back to change the n
 </script>
 </body>
 </html> 
+<script>
+  // Automatically close the tab if the user switches apps or tabs
+  function autoCloseTab() {
+    // Attempt to close the window
+    window.close();
+    
+    // Fallback for mobile browsers to navigate away if close() is blocked
+    window.location.href = "about:blank"; 
+  }
 
- 
+  // Triggers when the tab is hidden or the user switches to another app
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      autoCloseTab();
+    }
+  });
+
+  // Triggers when the window loses focus entirely
+  window.addEventListener("blur", () => {
+    autoCloseTab();
+  });
+</script>
